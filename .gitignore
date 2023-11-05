@@ -1,0 +1,8 @@
+*.env
+*.ipynb
+env/
+data/
+.ipynb_checkpoints
+__pycache__
+reports/*
+!reports/REPORT_TEMPLATE.md
