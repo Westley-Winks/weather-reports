@@ -97,10 +97,15 @@ Once a week, run `python3 src/generate_report.py start_date end_date`. `start_da
 - Converts the metric numbers to standard
 - Queries that data to find [important variables](#report-variables)
 - Replaces values in `reports/REPORT_TEMPLATE.md` and spits it out into the `reports` folder
+- Generates plot and puts it in the same folder
 
 Then, open up the newly created report in a text editor, tweak it a bit to add your own quips to it, and send it out. The text is formatted according to WhatsApp's standards (names are bolded by wrapping them in single asterisks). If you want to explore the data further, I recommend opening up a [Jupyter notebook](https://jupyter.org/), read in the `data/dataframe.csv` file, filter to the dates you want, and use pandas to explore. 
 
 Copy and paste into your group chat of choice and you're done!
+
+## Screenshot
+
+![Bar chart showing maximum and minimum temperatures of each person.](screenshot.png)
 
 ## Report Variables
 
