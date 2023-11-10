@@ -2,6 +2,7 @@ import datetime as dt
 import sys
 import os
 import matplotlib.pyplot as plt
+from numpy import atleast_2d, linspace
 
 from get_data import get_data
 
@@ -124,23 +125,58 @@ print("Generating plot...")
 
 # Generate plot
 
+
+def gradientbars(bars):
+    grad = atleast_2d(linspace(0, 1, 256)).T
+    ax = bars[0].axes
+    lim = ax.get_xlim()+ax.get_ylim()
+    for bar in bars:
+        bar.set_zorder(1)
+        bar.set_facecolor("none")
+        x, y = bar.get_xy()
+        w, h = bar.get_width(), bar.get_height()
+        ax.imshow(grad, extent=[x, x+w, y, y+h], aspect="auto",
+                  zorder=0, cmap="coolwarm_r", alpha=0.75)
+    ax.axis(lim)
+
+
 plt.style.use('seaborn-v0_8-poster')
 
 t = df.groupby("volunteer_name").mean(numeric_only=True).index
-F = df.groupby("volunteer_name").mean(numeric_only=True)["temp_max_F"]
-C = df.groupby("volunteer_name").mean(numeric_only=True)["temp_max_C"]
-F_avg = sum(F)/len(F)
+T_max_F = df.groupby("volunteer_name").max(numeric_only=True)["temp_max_F"]
+T_min_F = df.groupby("volunteer_name").min(numeric_only=True)["temp_min_F"]
+height = T_max_F - T_min_F
+
+T_max_avg = sum(T_max_F)/len(T_max_F)
+T_min_avg = sum(T_min_F)/len(T_min_F)
 
 fig, ax1 = plt.subplots()
-ax1.set_ylabel('Temperature [F]')
-markerline, stemlines, baseline = ax1.stem(t, F, bottom=F_avg)
-markerline.set_markerfacecolor("black")
-markerline.set_markersize(8)
-ax1.tick_params(axis='y')
+ax1.set_ylabel('Temperature [°F]')
+
+ax1.use_sticky_edges = False
+ax1.set_axisbelow(True)
+
+bars = plt.bar(t, height, bottom=T_min_F, width=0.5)
+
+gradientbars(bars)
+
+for bar in bars:
+    x, y = bar.get_xy()
+    w, h = bar.get_width(), bar.get_height()
+    ax1.plot([x, x+w], [y, y], color="blue", lw=2, alpha=0.8)
+    ax1.plot([x, x+w], [y+h, y+h], color="red", lw=2, alpha=0.8)
+
+plt.axhline(T_max_avg, color="red", ls="--", alpha=0.5)
+plt.axhline(T_min_avg, color="blue", ls="--", alpha=0.5)
+
+plt.title("Maximum and Minimum Temperatures Across the Week")
+ax1.minorticks_on()
+ax1.tick_params(axis='y', direction="in")
 ax1.tick_params(axis='x', labelrotation=90, direction="out", length=10, pad=5)
-ax1.grid(axis="y", which='both')
-ax1.grid(axis="x", linestyle="--")
-ax1.set_title("Average Maximum Temperatures Across the Week")
+ax1.grid(axis="y", which='major', alpha=0.8)
+ax1.grid(axis="y", which="minor", linestyle="--", alpha=0.35)
+ax1.grid(axis="x", linestyle="--", alpha=0.35)
+
 plt.tight_layout()
 
 # Save plot to report folder
