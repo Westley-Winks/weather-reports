@@ -50,12 +50,29 @@ def fetch_data(df: pd.DataFrame, date: str) -> pd.DataFrame:
         df["wind_max_speed_mps"] = data["wind"]["max"]["speed"]
         df["precipitation_mm"] = data["precipitation"]["total"]
     except:  # TODO; add better error handling
-        print(f"Problem detected: {df.index, date}")
+        print("Problem detected")
+        print(f"Status code: {r.status_code}")
+        print(f"Response: {r.json()}")
     return df
 
 
 def save_data(df, save_file):
-    df.to_csv(save_file, mode="a", header=False)
+    column_order = ["volunteer_name",
+                    "site_name",
+                    "lon",
+                    "lat",
+                    "date",
+                    "temp_max_C",
+                    "temp_min_C",
+                    "temp_afternoon_C",
+                    "temp_night_C",
+                    "temp_evening_C",
+                    "temp_morning_C",
+                    "wind_max_speed_mps",
+                    "precipitation_mm"
+                    ]
+
+    df[column_order].to_csv(save_file, mode="a", header=False)
     print(f"Complete. Data saved in {save_file}")
 
 
