@@ -6,3 +6,4 @@ data/
 __pycache__
 reports/*
 !reports/REPORT_TEMPLATE.md
+.cache*

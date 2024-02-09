@@ -1,78 +1,114 @@
 import pandas as pd
-import requests
-import os
 import json
+import openmeteo_requests
+from retry_requests import retry
+import requests_cache
 from dotenv import load_dotenv
 load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
 VOLUNTEER_DATA_FILE = "data/volunteers.json"
-RAW_WEATHER_DATA_FILE = "data/dataframe.csv"
+RAW_WEATHER_DATA_FILE = "data/meteo_dataframe.csv"
 
 
-def read_volunteer_data(file: str) -> pd.DataFrame:
+def read_volunteer_data(file: str) -> list:
     """
-      Converts the json data to a pandas dataframe
+        Converts the json data to a list of dictionaries. Each dictionary is
+        data for a different volunteer.
     """
     with open(file, "r", encoding="utf-8") as f:
         content = f.read()
 
     data = json.loads(content)
-    raw_df = pd.json_normalize(data["data"])
-    return raw_df
+    return data
 
 
-def fetch_data(df: pd.DataFrame, date: str) -> pd.DataFrame:
+def fetch_data(data: dict, start_date: str, end_date: str) -> pd.DataFrame:
     """
-        Calls the openweather api and puts it into a pandas dataframe
+        Calls the open-meteo api and puts it into a pandas dataframe
     """
-    try:
-        r = requests.get(
-            f"https://api.openweathermap.org/data/3.0/onecall/day_summary?"
-            f"lat={df['lat']}&"
-            f"lon={df['lon']}&"
-            f"date={date}&"
-            f"units=metric&"
-            f"appid={API_KEY}"
-        )
+    # Most of this code is from the open-meteo docs
+    cache_session = requests_cache.CachedSession('.cache', expire_after=-1)
+    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
+    openmeteo = openmeteo_requests.Client(session=retry_session)
 
-        r.raise_for_status()
+    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude": {data['lat']},
+        "longitude": {data['lon']},
+        "start_date": start_date,
+        "end_date": end_date,
+        "daily": [
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "temperature_2m_mean",
+            "apparent_temperature_max",
+            "apparent_temperature_min",
+            "precipitation_sum",
+            "rain_sum",
+            "wind_speed_10m_max",
+            "wind_gusts_10m_max"],
+        "timezone": "Europe/London",
+    }
+    responses = openmeteo.weather_api(url, params=params)
 
-        data = r.json()
+    response = responses[0]
 
-        df["date"] = data["date"]
-        df["temp_max_C"] = data["temperature"]["max"]
-        df["temp_min_C"] = data["temperature"]["min"]
-        df["temp_afternoon_C"] = data["temperature"]["afternoon"]
-        df["temp_night_C"] = data["temperature"]["night"]
-        df["temp_evening_C"] = data["temperature"]["evening"]
-        df["temp_morning_C"] = data["temperature"]["morning"]
-        df["wind_max_speed_mps"] = data["wind"]["max"]["speed"]
-        df["precipitation_mm"] = data["precipitation"]["total"]
-    except:  # TODO; add better error handling
-        print("Problem detected")
-        print(f"Status code: {r.status_code}")
-        print(f"Response: {r.json()}")
-    return df
+    daily = response.Daily()
+    daily_temperature_2m_max = daily.Variables(0).ValuesAsNumpy()
+    daily_temperature_2m_min = daily.Variables(1).ValuesAsNumpy()
+    daily_temperature_2m_mean = daily.Variables(2).ValuesAsNumpy()
+    daily_apparent_temperature_max = daily.Variables(3).ValuesAsNumpy()
+    daily_apparent_temperature_min = daily.Variables(4).ValuesAsNumpy()
+    daily_precipitation_sum = daily.Variables(5).ValuesAsNumpy()
+    daily_rain_sum = daily.Variables(6).ValuesAsNumpy()
+    daily_wind_speed_10m_max = daily.Variables(7).ValuesAsNumpy()
+    daily_wind_gusts_10m_max = daily.Variables(8).ValuesAsNumpy()
+
+    daily_data = {"date": pd.date_range(
+        start=pd.to_datetime(daily.Time(), unit="s"),
+        end=pd.to_datetime(daily.TimeEnd(), unit="s"),
+        freq=pd.Timedelta(seconds=daily.Interval()),
+        inclusive="left"
+    )}
+    daily_data["volunteer_name"] = data["volunteer_name"]
+    daily_data["site_name"] = data["site_name"]
+    daily_data["temp_max_C"] = daily_temperature_2m_max
+    daily_data["temp_min_C"] = daily_temperature_2m_min
+    daily_data["temp_mean_C"] = daily_temperature_2m_mean
+    daily_data["apparent_temp_max_C"] = daily_apparent_temperature_max
+    daily_data["apparent_temp_min_C"] = daily_apparent_temperature_min
+    daily_data["precipitation_sum_mm"] = daily_precipitation_sum
+    daily_data["rain_sum_mm"] = daily_rain_sum
+    daily_data["wind_speed_10m_max_kmh"] = daily_wind_speed_10m_max
+    daily_data["wind_gusts_10m_max_kmh"] = daily_wind_gusts_10m_max
+
+    daily_dataframe = pd.DataFrame(data=daily_data)
+
+    return daily_dataframe
 
 
 def save_data(df, save_file):
-    column_order = ["volunteer_name",
-                    "site_name",
-                    "lon",
-                    "lat",
-                    "date",
-                    "temp_max_C",
-                    "temp_min_C",
-                    "temp_afternoon_C",
-                    "temp_night_C",
-                    "temp_evening_C",
-                    "temp_morning_C",
-                    "wind_max_speed_mps",
-                    "precipitation_mm"
-                    ]
+    """
+        This saves the data into a csv file for further exploration in Jupyter.
+        The data file gets overwritten each time so only the previous weeks
+        data is saved.
+    """
+    column_order = [
+        "date",
+        "volunteer_name",
+        "site_name",
+        "temp_max_C",
+        "temp_min_C",
+        "temp_mean_C",
+        "apparent_temp_max_C",
+        "apparent_temp_min_C",
+        "precipitation_sum_mm",
+        "rain_sum_mm",
+        "wind_speed_10m_max_kmh",
+        "wind_gusts_10m_max_kmh"
+    ]
 
-    df[column_order].to_csv(save_file, mode="a", header=False)
+    df[column_order].to_csv(save_file, mode="w", header=True)
     print(f"Complete. Data saved in {save_file}")
 
 
@@ -89,10 +125,9 @@ def add_F_values(df):
     temp_cols = [
         "temp_max",
         "temp_min",
-        "temp_afternoon",
-        "temp_night",
-        "temp_evening",
-        "temp_morning"
+        "temp_mean",
+        "apparent_temp_max",
+        "apparent_temp_min",
     ]
 
     for col in temp_cols:
@@ -101,18 +136,15 @@ def add_F_values(df):
     return df
 
 
-def get_data(dates: list) -> pd.DataFrame:
-    raw_df = read_volunteer_data(VOLUNTEER_DATA_FILE)
+def get_data(start_date, end_date) -> pd.DataFrame:
+    volunteer_data = read_volunteer_data(VOLUNTEER_DATA_FILE)['data']
 
-    # Loop through the volunteer dataframe and call the api rowwise
-    first = True
-    for date in dates:
-        date = str(date)
-        if first:
-            df = raw_df.apply(fetch_data, date=date, axis=1)
-        else:
-            df = pd.concat([df, raw_df.apply(fetch_data, date=date, axis=1)])
-        first = False
+    volunteer_frames = []
+    for volunteer in volunteer_data:
+        volunteer_df = fetch_data(volunteer, start_date, end_date)
+        volunteer_frames.append(volunteer_df)
+
+    df = pd.concat(volunteer_frames)
 
     save_data(df, RAW_WEATHER_DATA_FILE)
 

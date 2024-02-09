@@ -18,10 +18,11 @@ while i <= date_end:
 
 print("Gathering data. This may take a while.")
 
-df = get_data(dates)
+df = get_data(date_start, date_end)
 
 # Below are all the report variables needed
 
+year_number = dt.date.strftime(date_start, "%Y")
 week_number = dt.date.strftime(date_start, "%U")
 date_start = dt.date.strftime(date_start, "%B %d, %Y")
 date_end = dt.date.strftime(date_end, "%B %d, %Y")
@@ -67,7 +68,7 @@ v_coldest_4_Tc = coldest.iloc[3]['temp_min_C'].round(1)
 v_coldest_4_Tf = coldest.iloc[3]['temp_min_F'].round(1)
 
 rainiest = df.groupby("volunteer_name").sum(numeric_only=True)[
-    "precipitation_mm"].sort_values(ascending=False)
+    "precipitation_sum_mm"].sort_values(ascending=False)
 
 v_rainiest = rainiest.index[0]
 v_rainiest_mm = rainiest[v_rainiest]
@@ -113,7 +114,7 @@ with open("reports/REPORT_TEMPLATE.md", "r", encoding="utf-8") as f:
 for key, value in replacements.items():
     content = content.replace(f"{{{{{key}}}}}", value)
 
-folder_name = f"Report W{week_number}"
+folder_name = f"Report {year_number}W{week_number}"
 
 os.mkdir(f"reports/{folder_name}")
 
