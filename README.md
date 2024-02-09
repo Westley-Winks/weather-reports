@@ -25,17 +25,9 @@ Clone this repo:
 
 ### Prerequisites
 
-You will need the following Python packages:
+All the packages you need are in the `requirements.txt` file. These can be installed by running `python3 -m pip install -r requirements.txt`.
 
-- requests
-- BeautifulSoup
-- lxml
-- Pandas
-- matplotlib
-- python-dotenv
-- Jupyter notebook (recommended for further exploring the data)
-
-These can be installed by running `python3 -m pip install -r requirements.txt`. You will need to [install Jupyter notebook](https://jupyter.org/install) separately or write your own Python scripts to query the data.
+For looking at the data more closely, you will need to [install Jupyter notebook](https://jupyter.org/install) separately or write your own Python scripts to query the data.
 
 ### Volunteer Locations
 
@@ -76,30 +68,29 @@ Then run `python3 src/parse_kml.py`. This will spit out all the volunteers' data
 
 For pandas to read it properly, you may need to format the JSON.
 
-
 **Alternatively**, you can write the JSON directly. Open `data/volunteers.json` and manually write in the above for all the volunteers.
 
 ### Data Access
 
-You will need to make an account with OpenWeather and get access to their [One Call 3.0 API](https://openweathermap.org/api/one-call-3#start). You get 1,000 calls per day for free. Generate an API token and put that in a `.env` file at the root of the project. It should look like this:
+All weather data is provided by [Open-Meteo.com](https://open-meteo.com/). No account or API key is required for non-commercial use, according to [their license](https://open-meteo.com/en/license) and [terms of use](https://open-meteo.com/en/terms).
 
-```text
-API_KEY=longstringofnumbersandletters
-```
+This project uses the Historical Weather endpoint rather than forecasts. As stated in the documentation, the data is delayed by five days.
 
 ## Usage
 
-Once a week, run `python3 src/generate_report.py start_date end_date`. `start_date` and `end_date` should be in [ISO8601 format](https://en.wikipedia.org/wiki/ISO_8601) (e.g. 2023-03-14) and they are inclusive. The script does the following:
+Once a week, run `python3 src/generate_report.py start_date end_date`. `start_date` and `end_date` should be in [ISO8601 format](https://en.wikipedia.org/wiki/ISO_8601) (e.g. 2023-03-14) and they are inclusive. Remember that the data is delayed by five days so your `end_date` should be at least five days before the current date.
+
+The script does the following:
 
 - Reads the volunteer locations located in `data/volunteers.json`
-- Calls the [OpenWeather daily aggregation API](https://openweathermap.org/api/one-call-3#history_daily_aggregation) and gets daily weather stats for each location and each day in the date range [`start_date`, `end_date`]
-- Saves the data to `data/dataframe.csv`
+- Calls the [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) and gets daily weather stats for each location and each day in the date range [`start_date`, `end_date`]
+- Saves the data to `data/meteo_dataframe.csv`, overwriting it each time the script is run
 - Converts the metric numbers to standard
 - Queries that data to find [important variables](#report-variables)
 - Replaces values in `reports/REPORT_TEMPLATE.md` and spits it out into the `reports` folder
 - Generates plot and puts it in the same folder
 
-Then, open up the newly created report in a text editor, tweak it a bit to add your own quips to it, and send it out. The text is formatted according to WhatsApp's standards (names are bolded by wrapping them in single asterisks). If you want to explore the data further, I recommend opening up a [Jupyter notebook](https://jupyter.org/), read in the `data/dataframe.csv` file, filter to the dates you want, and use pandas to explore. 
+Then, open up the newly created report in a text editor, tweak it a bit to add your own quips to it, and send it out. The text is formatted according to WhatsApp's standards (names are bolded by wrapping them in single asterisks). If you want to explore the data further, I recommend opening up a [Jupyter notebook](https://jupyter.org/), read in the `data/meteo_dataframe.csv` file, filter to the dates you want, and use pandas to explore. 
 
 Copy and paste into your group chat of choice and you're done!
 
@@ -149,4 +140,3 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
